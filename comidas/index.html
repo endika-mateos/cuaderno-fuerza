@@ -65,6 +65,8 @@ textarea{min-height:5em;resize:vertical}
 .macros{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}
 .mac small{display:block;font-size:.72rem;color:var(--muted);text-transform:uppercase;letter-spacing:.06em}
 .mac b{font:700 1.25rem var(--display);font-variant-numeric:tabular-nums}
+.mac input{margin-top:4px;text-align:center;font-variant-numeric:tabular-nums}
+.mac .btn{margin-top:4px;width:100%}
 .mac .goal{display:block;line-height:1.2}
 .mac .bar{height:6px;border-radius:3px;background:var(--sunk);overflow:hidden;margin-top:4px}
 .mac .bar span{display:block;height:100%;background:var(--accent)}
@@ -314,8 +316,53 @@ function gapText(t, tg){
 }
 
 /* ---------- HOY ---------- */
+/* ---------- WHOOP: ajusta el objetivo de hoy con strain, recuperación y sueño ---------- */
+const isoToday = () => { const x = new Date(); return new Date(x.getTime() - x.getTimezoneOffset()*60000).toISOString().slice(0,10); };
+let whoop = load("ck-whoop", {});
+const parseSleep = v => { const m = String(v).trim().match(/^(\d{1,2})(?:[:.,h ]+(\d{1,2}))?/); return m ? Number(m[1]) + (Number(m[2] || 0) / 60) : null; };
+const strainType = st => st >= 18 ? "partido" : st >= 14 ? "alta" : st >= 10 ? "media" : "descanso";
+function whoopTarget(base, w){
+  if (!w) return {tg: base, notes: []};
+  const notes = [];
+  let tg = {...base};
+  if (w.strain != null){
+    const k = strainType(w.strain);
+    tg = {...TARGETS[k], n: (k === "descanso" ? "Carga baja" : TARGETS[k].n) + " según WHOOP"};
+  }
+  if (w.rec != null){
+    const extra = w.rec < 34 ? 60 : w.rec < 67 ? 30 : 0;
+    if (extra){ tg.c += extra; tg.kcal += extra * 4; }
+    notes.push(w.rec < 34
+      ? `🔴 Recuperación ${w.rec} %: hoy no hagas déficit. Te sumo ${extra} g de hidratos y prioriza descansar.`
+      : w.rec < 67
+      ? `🟡 Recuperación ${w.rec} %: déficit suave. Te sumo ${extra} g de hidratos.`
+      : `🟢 Recuperación ${w.rec} %: día normal, sigue el plan.`);
+  }
+  if (w.sleep != null && w.sleep < 7){
+    const h = Math.floor(w.sleep), m = Math.round((w.sleep - h) * 60);
+    notes.push(`😴 Has dormido ${h}:${String(m).padStart(2, "0")} h. Cena con algo de hidratos (ayudan a dormir) y acuéstate antes esta noche.`);
+  }
+  return {tg, notes};
+}
+function whoopCard(w){
+  const v = w || {};
+  const sl = v.sleep != null ? `${Math.floor(v.sleep)}:${String(Math.round((v.sleep % 1) * 60)).padStart(2, "0")}` : "";
+  return `<div class="card">
+    <h3>Datos de WHOOP de hoy</h3>
+    <p class="muted small">Mételos después de entrenar. El strain decide la carga del día; la recuperación y el sueño ajustan los hidratos.</p>
+    <div class="macros">
+      <label class="mac" for="w-strain"><small>Strain</small><input id="w-strain" type="text" inputmode="decimal" placeholder="6,3" value="${v.strain ?? ""}"></label>
+      <label class="mac" for="w-rec"><small>Recovery %</small><input id="w-rec" type="text" inputmode="numeric" placeholder="46" value="${v.rec ?? ""}"></label>
+      <label class="mac" for="w-sleep"><small>Sueño h</small><input id="w-sleep" type="text" inputmode="decimal" placeholder="6:23" value="${sl}"></label>
+      <span class="mac"><small>&nbsp;</small><button class="btn small" id="w-save" type="button">Usar</button></span>
+    </div>
+    ${w ? `<button class="btn ghost small" id="w-clear" type="button" style="align-self:flex-start">Quitar datos de WHOOP</button>` : ""}
+  </div>`;
+}
+
 function renderHoy(){
-  const d = DAYS[todayIdx], tg = TARGETS[d.t], dp = plan[todayIdx] || {}, t = dayTotals(todayIdx);
+  const d = DAYS[todayIdx], w = whoop[isoToday()], dp = plan[todayIdx] || {}, t = dayTotals(todayIdx);
+  const {tg, notes} = whoopTarget(TARGETS[d.t], w);
   const items = SLOTS.map(s => {
     const e = dp[s.k], r = e && byId(e.id);
     if (!r) return `<div class="slot"><label>${s.n}</label><span class="muted">Sin planificar</span></div>`;
@@ -323,10 +370,20 @@ function renderHoy(){
     return `<div class="slot"><label>${s.n}</label><b>${esc(r.n)}${m !== 1 ? ` · ×${String(m).replace(".", ",")}` : ""}</b><button class="btn ghost small" data-open="${r.id}" type="button">Ver receta</button><span class="info">${macroLine(macros(r, m))}</span></div>`;
   }).join("");
   $("hoy").innerHTML = `
-    <div class="card"><span class="daytype">${d.n} · ${tg.n}</span>${macroBars(t, tg)}${gapText(t, tg)}</div>
+    <div class="card"><span class="daytype">${d.n} · ${tg.n}</span>${macroBars(t, tg)}${notes.map(n => `<p class="gap">${n}</p>`).join("")}${gapText(t, tg)}</div>
+    ${whoopCard(w)}
     <div class="card">${items}</div>
     <p class="muted small">Recuerda apuntarlo en Yazio. Para cambiar el plan de hoy, ve a <b>Semana</b>.</p>`;
   $("hoy").querySelectorAll("[data-open]").forEach(b => b.onclick = () => { openId = b.dataset.open; editing = null; showTab("recetas"); });
+  $("w-save").onclick = () => {
+    const num = id => { const x = String($(id).value).replace(",", "."); return x === "" || isNaN(Number(x)) ? null : Number(x); };
+    const e = {strain: num("w-strain"), rec: num("w-rec"), sleep: $("w-sleep").value ? parseSleep($("w-sleep").value) : null};
+    if (e.strain == null && e.rec == null && e.sleep == null) return;
+    whoop[isoToday()] = e;
+    Object.keys(whoop).sort().slice(0, -60).forEach(k => delete whoop[k]);
+    store("ck-whoop", whoop); renderHoy();
+  };
+  if ($("w-clear")) $("w-clear").onclick = () => { delete whoop[isoToday()]; store("ck-whoop", whoop); renderHoy(); };
 }
 
 /* ---------- SEMANA ---------- */
@@ -534,7 +591,7 @@ $("share").onclick = async () => {
 /* ---------- copia de seguridad ---------- */
 $("bexport").onclick = async () => {
   const name = `cuaderno-cocina-${new Date().toISOString().slice(0,10)}.json`;
-  const file = new File([JSON.stringify({app:"cuaderno-cocina", version:1, custom, meta, plan, checked}, null, 1)], name, {type:"application/json"});
+  const file = new File([JSON.stringify({app:"cuaderno-cocina", version:1, custom, meta, plan, checked, whoop}, null, 1)], name, {type:"application/json"});
   try {
     if (navigator.canShare && navigator.canShare({files:[file]})) await navigator.share({files:[file], title:"Copia del Cuaderno de cocina"});
     else { const a = document.createElement("a"); a.href = URL.createObjectURL(file); a.download = name; a.click(); }
@@ -546,7 +603,7 @@ $("bimport").onchange = async ev => {
   try {
     const d = JSON.parse(await f.text());
     if (d.app !== "cuaderno-cocina") throw 0;
-    custom = d.custom || []; meta = d.meta || {}; plan = d.plan || {}; checked = d.checked || {};
+    custom = d.custom || []; meta = d.meta || {}; plan = d.plan || {}; checked = d.checked || {}; whoop = d.whoop || {}; store("ck-whoop", whoop);
     store("ck-custom", custom); store("ck-meta", meta); store("ck-plan", plan); store("ck-check", checked);
     $("bmsg").textContent = "Copia cargada."; renderAll();
   } catch(e){ $("bmsg").textContent = "Ese archivo no es una copia del Cuaderno de cocina."; }

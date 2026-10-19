@@ -1,6 +1,6 @@
 // Guarda la app para que funcione sin cobertura en el gimnasio.
 // Sube CACHE cuando cambies index.html para que los móviles cojan la versión nueva.
-const CACHE = "cuaderno-fuerza-v2";
+const CACHE = "cuaderno-fuerza-v3";
 const FILES = ["./", "index.html", "manifest.webmanifest", "apple-touch-icon.png", "icon-192.png", "icon-512.png"];
 
 self.addEventListener("install", e => {

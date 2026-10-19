@@ -158,7 +158,7 @@ tr:last-child td{border-bottom:0}
     <p class="muted">Pésate 2 o 3 mañanas por semana, en ayunas y después de ir al baño. Lo que cuenta es la media, no un día suelto.</p>
     <div class="meta">
       <label for="pfecha">Fecha <input type="date" id="pfecha"></label>
-      <label for="pkg">Peso <input type="number" id="pkg" step="0.1" min="40" max="150" inputmode="decimal" placeholder="80,0" style="width:6.5em"></label>
+      <label for="pkg">Peso <input type="text" id="pkg" inputmode="decimal" placeholder="80,0" style="width:6.5em"></label>
       <button class="btn ghost" id="pguardar" type="button">Añadir</button>
       <span class="status" id="pstatus" role="status"></span>
     </div>
@@ -343,7 +343,7 @@ function renderTrain(){
       const rLabel = ex.kind === "seg" ? "seg" : "reps";
       return ex.kind === "kg"
         ? `<div class="set"><span>Serie ${i+1}</span>
-            <label for="${ex.id}-${i}-kg"><input type="number" id="${ex.id}-${i}-kg" data-ex="${ex.id}" data-i="${i}" data-f="kg" step="0.5" min="0" inputmode="decimal" value="${kgVal}">kg</label>
+            <label for="${ex.id}-${i}-kg"><input type="text" id="${ex.id}-${i}-kg" data-ex="${ex.id}" data-i="${i}" data-f="kg" inputmode="decimal" value="${kgVal === "" ? "" : String(kgVal).replace(".", ",")}">kg</label>
             <label for="${ex.id}-${i}-r"><input type="number" id="${ex.id}-${i}-r" data-ex="${ex.id}" data-i="${i}" data-f="r" min="0" inputmode="numeric" placeholder="${reps}" value="${v.r ?? ""}">${rLabel}</label></div>`
         : `<div class="set one"><span>Serie ${i+1}</span>
             <label for="${ex.id}-${i}-r"><input type="number" id="${ex.id}-${i}-r" data-ex="${ex.id}" data-i="${i}" data-f="r" min="0" inputmode="numeric" placeholder="${reps}" value="${v.r ?? ""}">${rLabel}</label></div>`;
@@ -353,7 +353,8 @@ function renderTrain(){
   }).join("");
   $("exs").querySelectorAll("input").forEach(inp => inp.oninput = () => {
     const {ex, i, f} = inp.dataset; const arr = draft[cur][ex]; arr[i] = arr[i] || {};
-    arr[i][f] = inp.value === "" ? undefined : Number(inp.value);
+    const v = Number(String(inp.value).replace(",", "."));
+    arr[i][f] = inp.value === "" || isNaN(v) ? undefined : v;
     saveDraft();
   });
   $("exs").querySelectorAll("button.rest").forEach(b => b.onclick = () => startTimer(Number(b.dataset.secs)));
@@ -374,7 +375,7 @@ $("guardar").onclick = () => {
       const r = $(`${ex.id}-${i}-r`).value;
       if (r === "") continue;
       const set = {r: Number(r)};
-      if (ex.kind === "kg"){ const kg = $(`${ex.id}-${i}-kg`).value; set.kg = kg === "" ? 0 : Number(kg); }
+      if (ex.kind === "kg"){ const kg = $(`${ex.id}-${i}-kg`).value; set.kg = kg === "" ? 0 : (Number(String(kg).replace(",", ".")) || 0); }
       sets.push(set);
     }
     if (sets.length) entries[ex.id] = sets;
