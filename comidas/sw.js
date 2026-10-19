@@ -1,6 +1,6 @@
 // Guarda la app de cocina para que funcione sin cobertura (por ejemplo, en el súper).
 // Sube CACHE cuando cambies index.html para que los móviles cojan la versión nueva.
-const CACHE = "cuaderno-cocina-v2";
+const CACHE = "cuaderno-cocina-v3";
 const FILES = ["./", "index.html", "manifest.webmanifest", "apple-touch-icon.png", "icon-192.png", "icon-512.png"];
 
 self.addEventListener("install", e => {
@@ -17,7 +17,7 @@ self.addEventListener("fetch", e => {
   const req = e.request;
   if (req.method !== "GET") return;
   if (req.mode === "navigate") {
-    e.respondWith(fetch(req).then(res => {
+    e.respondWith(fetch(req, {cache: "no-cache"}).then(res => {
       const copy = res.clone(); caches.open(CACHE).then(c => c.put(req, copy)); return res;
     }).catch(() => caches.match(req).then(hit => hit || caches.match("./"))));
     return;

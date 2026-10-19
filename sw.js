@@ -1,6 +1,6 @@
 // Guarda la app para que funcione sin cobertura en el gimnasio.
 // Sube CACHE cuando cambies index.html para que los móviles cojan la versión nueva.
-const CACHE = "cuaderno-fuerza-v3";
+const CACHE = "cuaderno-fuerza-v4";
 const FILES = ["./", "index.html", "manifest.webmanifest", "apple-touch-icon.png", "icon-192.png", "icon-512.png"];
 
 self.addEventListener("install", e => {
@@ -21,7 +21,7 @@ self.addEventListener("fetch", e => {
   // La app de cocina (/comidas/) tiene su propio service worker
   if (new URL(req.url).pathname.includes("/comidas/")) return;
   if (req.mode === "navigate") {
-    e.respondWith(fetch(req).then(res => {
+    e.respondWith(fetch(req, {cache: "no-cache"}).then(res => {
       const copy = res.clone(); caches.open(CACHE).then(c => c.put("./", copy)); return res;
     }).catch(() => caches.match("./")));
     return;
